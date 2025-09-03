@@ -39,12 +39,10 @@ export default function ChatBotPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const clientId = typeof window !== "undefined" ? getClientId() : "server";
 
-  // Scroll to bottom on messages update
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Send message handler
   const sendMessage = async () => {
     const trimmedInput = input.trim();
     if (!trimmedInput || isSending || finished) return;
@@ -59,25 +57,22 @@ export default function ChatBotPage() {
         body: JSON.stringify({ sessionId, message: trimmedInput, clientId }),
       });
 
-      if (!res.ok) throw new Error("Network error");
-      const data = await res.json();
-
+      const data = await res.json().catch(() => ({ reply: "No response body." }));
       setMessages((m) => [
         ...m,
-        { role: "assistant", text: data.reply ?? "No reply from server." },
+        { role: "assistant", text: data.reply ?? (res.ok ? "No reply from server." : "Server error.") },
       ]);
       if (data.isFinal) setFinished(true);
-    } catch {
+    } catch (e) {
       setMessages((m) => [
         ...m,
-        { role: "assistant", text: "⚠️ Error sending message." },
+        { role: "assistant", text: "⚠️ Network error." },
       ]);
     } finally {
       setIsSending(false);
     }
   };
 
-  // Handle Enter key to send message
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey && input.trim()) {
       e.preventDefault();
@@ -86,25 +81,34 @@ export default function ChatBotPage() {
   };
 
   return (
-    <Card className="max-w-2xl mx-auto flex flex-col h-[600px] shadow-md rounded-xl border mt-8"
-      style={{ background: "radial-gradient(900px 400px at 90% -10%, rgba(255,176,25,0.10), rgba(255,255,255,0))" }}
-    >
-      {/* Header */}
-      <CardHeader className="flex items-center justify-between p-4 rounded-t-xl"
-        style={{ background: "linear-gradient(180deg, rgba(255,176,25,0.10), rgba(255,255,255,0))" }}
-      >
-        <div className="flex items-center gap-2">
-          <Bot className="w-6 h-6 text-gray-700" />
-          <CardTitle className="text-lg font-semibold text-gray-900">
-            AI Chat Assistant
-          </CardTitle>
-          <Badge variant="outline" className="text-xs text-gray-600 border-gray-300">
-            Live
-          </Badge>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="animate-slide-up">
+          <h1 className="text-4xl font-bold gradient-text mb-2">AI Assistant</h1>
+          <p className="text-gray-600 font-medium">Plan your day with intelligent task management</p>
         </div>
-      </CardHeader>
+        <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 animate-pulse-slow">
+          ✨ Live
+        </Badge>
+      </div>
+      
+      <Card className="max-w-4xl mx-auto flex flex-col h-[700px] shadow-2xl rounded-2xl border-0 overflow-hidden animate-scale-in"
+        style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,248,240,0.8) 100%)" }}
+      >
+        <CardHeader className="flex items-center justify-between p-6 bg-gradient-to-r from-orange-50 to-pink-50 border-b border-orange-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-pink-500 flex items-center justify-center shadow-lg">
+              <Bot className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-xl font-bold text-gray-800">
+                AI Chat Assistant
+              </CardTitle>
+              <p className="text-sm text-gray-600">Ready to help you plan your tasks</p>
+            </div>
+          </div>
+        </CardHeader>
 
-      {/* Messages scroll area */}
       <CardContent className="flex-1 p-4 overflow-hidden rounded-b-xl"
         style={{ background: "linear-gradient(180deg, rgba(255,142,142,0.08), rgba(255,255,255,0))" }}
       >
@@ -160,7 +164,6 @@ export default function ChatBotPage() {
 
       <Separator className="border-gray-200" />
 
-      {/* Input area */}
       {!finished ? (
         <form
           className="flex gap-2 p-4 rounded-b-xl"
@@ -193,6 +196,7 @@ export default function ChatBotPage() {
           Conversation has ended.
         </p>
       )}
-    </Card>
+      </Card>
+    </div>
   );
 }
