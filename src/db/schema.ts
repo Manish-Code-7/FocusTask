@@ -78,6 +78,27 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ---------------- CHAT SESSIONS (for chatbot) ----------------
+export const chatSessions = pgTable("chat_sessions", {
+  id: text("id").primaryKey().$defaultFn(() => nanoid()),
+  clientId: text("client_id").notNull(), // anonymous client identifier
+  title: text("title").default("New Chat"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ---------------- CHAT MESSAGES ----------------
+export const chatMessages = pgTable("chat_messages", {
+  id: text("id").primaryKey().$defaultFn(() => nanoid()),
+  sessionId: text("session_id")
+    .notNull()
+    .references(() => chatSessions.id, { onDelete: "cascade" }),
+  role: text("role").notNull(), // "user" | "assistant"
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ---------------- TASKS ----------------
 export const tasks = pgTable("tasks", {
   id: text("id").primaryKey().$defaultFn(() => nanoid()),

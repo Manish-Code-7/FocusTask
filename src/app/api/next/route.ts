@@ -13,7 +13,6 @@ type ExtractedTask = { title: string; estimatedMinutes: number };
 
 function tryExtractTasks(text: string): ExtractedTask[] | null {
   try {
-    // Look for a JSON array in the text
     const match = text.match(/\[[\s\S]*\]/);
     if (!match) return null;
     const parsed: unknown = JSON.parse(match[0]);
@@ -45,17 +44,7 @@ export async function POST(req: Request) {
     const { sessionId, message, clientId } = await req.json();
 
     if (!sessionId) {
-      return NextResponse.json(
-        { reply: "Oops, missing session ID! Please try again.", isFinal: true },
-        { status: 400 }
-      );
-    }
-
-    if (!ai) {
-      return NextResponse.json(
-        { reply: "AI is not configured. Please set GEMINI_API_KEY.", isFinal: true },
-        { status: 500 }
-      );
+      return NextResponse.json({ reply: "Missing session ID.", isFinal: true });
     }
 
     // Initialize session if not present
@@ -69,21 +58,30 @@ export async function POST(req: Request) {
       session.history.push(`User: ${String(message).trim()}`);
     }
 
-    const systemPrompt = (
-      "You are Chatty, an assistant that converts user inputs into a structured plan.\n" +
-      "When appropriate, output ONLY a JSON array of tasks (no extra text).\n" +
-      "Each task object should be {\"title\":string,\"estimatedMinutes\":number}."
-    );
+    let botReply = "";
 
-    const userPrompt = (
-      "Conversation history (most recent last):\n" +
-      session.history.join("\n") +
-      "\nGenerate the next helpful reply. If you are ready to propose tasks, include only the JSON array."
-    );
+    if (!ai) {
+      botReply = "AI is not configured. You can still list tasks in JSON, e.g. [ {\"title\":\"Read chapter\",\"estimatedMinutes\":30} ].";
+    } else {
+      try {
+        const systemPrompt =
+          "You are Chatty, an assistant that converts user inputs into a structured plan.\n" +
+          "When appropriate, output ONLY a JSON array of tasks (no extra text).\n" +
+          "Each task object should be {\"title\":string,\"estimatedMinutes\":number}.";
 
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent([systemPrompt, userPrompt]);
-    const botReply = result.response?.text()?.trim() || "Sorry, I couldn't generate a response now.";
+        const userPrompt =
+          "Conversation history (most recent last):\n" +
+          session.history.join("\n") +
+          "\nGenerate the next helpful reply. If you are ready to propose tasks, include only the JSON array.";
+
+        const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent([systemPrompt, userPrompt]);
+        botReply = result.response?.text()?.trim() || "I couldn't generate a response right now.";
+      } catch (genErr) {
+        console.error("Gemini error:", genErr);
+        botReply = "Temporary AI error. You can type tasks as JSON: [{\"title\":\"Demo\",\"estimatedMinutes\":25}].";
+      }
+    }
 
     // Add bot reply to session history
     session.history.push(`Bot: ${botReply}`);
@@ -102,9 +100,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply: botReply, isFinal });
   } catch (error) {
     console.error("Error in /api/next:", error);
-    return NextResponse.json(
-      { reply: "Sorry, something went wrong. Please try again later.", isFinal: true },
-      { status: 500 }
-    );
+    // Return 200 to avoid client treating as network error; include message
+    return NextResponse.json({ reply: "Unexpected server error. Try again.", isFinal: false });
   }
 }

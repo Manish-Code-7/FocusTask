@@ -83,47 +83,76 @@ export default function Home() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Track your goals for today.</p>
+        <div className="animate-slide-up">
+          <h1 className="text-4xl font-bold gradient-text mb-2">Dashboard</h1>
+          <p className="text-gray-600 font-medium">Track your goals and stay focused ✨</p>
         </div>
         <Link href="/chatbot">
-          <Button className="gap-2">
-            <MessageSquare className="h-4 w-4" /> Ask AI to plan
+          <Button className="gap-2 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+            <MessageSquare className="h-4 w-4" /> AI Assistant
           </Button>
         </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <Card style={{ background: "linear-gradient(180deg, rgba(255,176,25,0.10), rgba(255,255,255,0))" }}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+        <Card className="hover-lift animate-scale-in" style={{ animationDelay: "0.1s" }}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+              Pending Tasks
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-2 text-2xl font-bold">
-              <ListChecks className="h-5 w-5 text-muted-foreground" /> {pending.length}
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-100 to-orange-200 flex items-center justify-center">
+                <ListChecks className="h-6 w-6 text-orange-600" />
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-gray-800">{pending.length}</div>
+                <div className="text-sm text-gray-500">Awaiting completion</div>
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card style={{ background: "linear-gradient(180deg, rgba(255,142,142,0.10), rgba(255,255,255,0))" }}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+        <Card className="hover-lift animate-scale-in" style={{ animationDelay: "0.2s" }}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              Completed
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-2 text-2xl font-bold">
-              <CheckCircle2 className="h-5 w-5 text-muted-foreground" /> {completed.length}
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-gray-800">{completed.length}</div>
+                <div className="text-sm text-gray-500">Successfully done</div>
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card style={{ background: "linear-gradient(180deg, rgba(164,197,255,0.12), rgba(255,255,255,0))" }}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Focus Time (est.)</CardTitle>
+        <Card className="hover-lift animate-scale-in" style={{ animationDelay: "0.3s" }}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+              Focus Time
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {pending.reduce((sum, t) => sum + t.estimatedMinutes, 0)} mins
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                <Timer className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-gray-800">
+                  {pending.reduce((sum, t) => sum + t.estimatedMinutes, 0)}
+                </div>
+                <div className="text-sm text-gray-500">Minutes estimated</div>
+              </div>
             </div>
           </CardContent>
         </Card>
