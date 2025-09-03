@@ -1,121 +1,167 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { Send, Bot, User } from "lucide-react";
 
 export default function ChatBot() {
-  const [sessionId] = useState(() => uuidv4()); // Unique session ID on mount
-  const [messages, setMessages] = useState<{ role: string; text: string }[]>([]);
+  const [sessionId] = useState(() => uuidv4());
+  const [messages, setMessages] = useState<
+    { role: "user" | "assistant"; text: string }[]
+  >([]);
   const [input, setInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
   const [finished, setFinished] = useState(false);
-
-  // Ref to the messages container to scroll to bottom on new message
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  // Scroll to bottom on messages update
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Send message handler
   const sendMessage = async () => {
-    if (!input.trim()) return;
-
-    // Append user message
-    setMessages((prev) => [...prev, { role: "user", text: input.trim() }]);
+    const trimmedInput = input.trim();
+    if (!trimmedInput || isSending || finished) return;
+    setMessages((m) => [...m, { role: "user", text: trimmedInput }]);
     setInput("");
+    setIsSending(true);
 
     try {
       const res = await fetch("/api/next", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, message: input.trim() }),
+        body: JSON.stringify({ sessionId, message: trimmedInput }),
       });
 
-      if (!res.ok) throw new Error("Network response was not ok");
-
+      if (!res.ok) throw new Error("Network error");
       const data = await res.json();
 
-      setMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
-
-      if (data.isFinal) {
-        setFinished(true);
-      }
-    } catch (error) {
-      // Optionally handle error state here (e.g. show error message)
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: "Sorry, there was an error sending your message." },
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", text: data.reply ?? "No reply from server." },
       ]);
+      if (data.isFinal) setFinished(true);
+    } catch {
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", text: "⚠️ Error sending message." },
+      ]);
+    } finally {
+      setIsSending(false);
     }
   };
 
+  // Handle Enter key to send message
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey && !finished && input.trim()) {
+    if (e.key === "Enter" && !e.shiftKey && input.trim()) {
       e.preventDefault();
       sendMessage();
     }
   };
 
   return (
-    <Card className="w-full max-w-xl mx-auto p-4 shadow-lg rounded-2xl bg-white">
-      <CardContent className="space-y-4 flex flex-col">
-        <div
-          className="flex-1 overflow-y-auto border rounded-lg p-4 bg-gray-50"
-          style={{ scrollbarWidth: "thin" }}
-          aria-live="polite"
-          aria-label="Chat messages"
-        >
-          {messages.length === 0 && (
-            <p className="text-gray-400 text-center select-none mt-20">Start the conversation...</p>
-          )}
-          {messages.map((m, i) => (
-            <div
-              key={i}
-              className={`mb-3 max-w-[80%] px-4 py-2 rounded-lg shadow-sm ${
-                m.role === "user"
-                  ? "ml-auto bg-blue-600 text-white text-right"
-                  : "mr-auto bg-green-100 text-green-900 text-left"
-              }`}
-            >
-              {m.text}
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
+    <Card className="max-w-2xl mx-auto flex flex-col h-[600px] shadow-xl rounded-2xl border bg-white">
+      {/* Header */}
+      <CardHeader className="flex items-center justify-between p-4 bg-gray-100 rounded-t-2xl border-b">
+        <div className="flex items-center gap-2">
+          <Bot className="w-6 h-6 text-blue-600" />
+          <CardTitle className="text-lg font-semibold">AI Chat Assistant</CardTitle>
+          <Badge variant="outline" className="text-xs">Live</Badge>
         </div>
+      </CardHeader>
 
-        {!finished && (
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              sendMessage();
-            }}
-          >
-            <Input
-              aria-label="Type your message"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your message..."
-              onKeyDown={handleKeyDown}
-              autoFocus
-              className="flex-1"
-              disabled={finished}
-            />
-            <Button type="submit" disabled={!input.trim()}>
-              Send
-            </Button>
-          </form>
-        )}
+      {/* Messages scroll area */}
+      <CardContent className="flex-1 p-4 overflow-hidden">
+        <ScrollArea className="h-full space-y-4 bg-gray-50 rounded-lg p-4">
+          {messages.length === 0 && (
+            <p className="text-center text-gray-400 mt-20 select-none">
+              Start the conversation...
+            </p>
+          )}
 
-        {finished && (
-          <p className="text-center text-gray-500 mt-2 select-none">Conversation has ended.</p>
-        )}
+          {messages.map((m, i) => {
+            const isUser = m.role === "user";
+            return (
+              <div
+                key={i}
+                className={`flex items-start gap-2 max-w-xs ${
+                  isUser ? "justify-end ml-auto" : "justify-start"
+                }`}
+              >
+                {!isUser && (
+                  <Avatar className="w-8 h-8">
+                    <AvatarFallback className="bg-blue-100 text-blue-600">
+                      <Bot size={16} />
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+
+                <div
+                  className={`px-4 py-2 rounded-2xl text-sm break-words ${
+                    isUser
+                      ? "bg-blue-600 text-white rounded-br-none"
+                      : "bg-white text-gray-900 border border-gray-200 rounded-bl-none"
+                  }`}
+                >
+                  {m.text}
+                </div>
+
+                {isUser && (
+                  <Avatar className="w-8 h-8">
+                    <AvatarFallback className="bg-gray-200 text-gray-600">
+                      <User size={16} />
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+              </div>
+            );
+          })}
+          <div ref={messagesEndRef} />
+        </ScrollArea>
       </CardContent>
+
+      <Separator />
+
+      {/* Input area */}
+      {!finished ? (
+        <form
+          className="flex gap-2 p-4 bg-gray-100 rounded-b-2xl border-t"
+          onSubmit={(e) => {
+            e.preventDefault();
+            sendMessage();
+          }}
+        >
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Type your message..."
+            autoFocus
+            disabled={isSending}
+            className="flex-1"
+          />
+          <Button type="submit" disabled={!input.trim() || isSending} className="flex items-center gap-1">
+            <Send className="w-4 h-4" />
+            Send
+          </Button>
+        </form>
+      ) : (
+        <p className="text-center text-gray-500 py-4 select-none">
+          Conversation has ended.
+        </p>
+      )}
     </Card>
   );
 }

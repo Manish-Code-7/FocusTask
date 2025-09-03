@@ -1,115 +1,100 @@
-// app/api/next/route.ts
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Initialize OpenAI client (v4 SDK)
-const openai = new OpenAI({
-  apiKey: process.env.OPEN_API_KEY!,
-});
+const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-// Fixed flow of questions
-const FLOW = [
-  { key: "userMood", question: "How are you feeling today?" },
-  { key: "focusScore", question: "On a scale of 1 to 10, how focused do you feel?" },
-  { key: "tasksList", question: "What are the main tasks you want to work on today?" },
-  { key: "deadlines", question: "Do you have any deadlines today?" },
-  { key: "importantTask", question: "What is your most important task?" },
-  { key: "workSession", question: "How long do you want each work session to be?" },
-  { key: "syncCalendar", question: "Would you like to sync with your calendar?" },
-  { key: "focusMode", question: "Should I enable focus mode for you?" },
-];
-
-// In-memory session store (not persistent – consider DB in production)
-const sessions: Record<string, { step: number; answers: Record<string, string> }> = {};
+// Store session states with conversation history and step index
+const sessions: Record<string, { step: number; history: string[] }> = {};
 
 export async function POST(req: Request) {
   try {
     const { sessionId, message } = await req.json();
 
     if (!sessionId) {
-      return NextResponse.json({ reply: "Missing session ID", isFinal: true }, { status: 400 });
+      return NextResponse.json(
+        { reply: "Oops, missing session ID! Please try again.", isFinal: true },
+        { status: 400 }
+      );
     }
 
+    // Initialize session if not present
     if (!sessions[sessionId]) {
-      sessions[sessionId] = { step: 0, answers: {} };
+      sessions[sessionId] = { step: 0, history: [] };
     }
 
     const session = sessions[sessionId];
-    const step = session.step;
 
-    // Save previous answer
-    if (step > 0 && step <= FLOW.length) {
-      const prevKey = FLOW[step - 1].key;
-      session.answers[prevKey] = message?.trim?.() || "";
+    // Add user's latest message to history if not the first message
+    if (message && session.step > 0) {
+      session.history.push(`User: ${message.trim()}`);
     }
 
-    // If all questions answered → create final plan
-    if (step >= FLOW.length) {
-      const systemPrompt = `You are a friendly productivity coach.`;
-      const userPrompt = `
-Create a clear and concise daily productivity plan based on these inputs:
+    // Compose prompt for Gemini generative model
+    // Instructions request generating next question or concluding if done
+    const systemPrompt = `
+You are Chatty, an intelligent assistant designed to help users organize their tasks efficiently by breaking them down into focused work sessions with appropriate breaks.
 
-Mood: ${session.answers.userMood || "N/A"}
-Focus score: ${session.answers.focusScore || "N/A"}
-Tasks: ${session.answers.tasksList || "N/A"}
-Deadlines: ${session.answers.deadlines || "N/A"}
-Most important task: ${session.answers.importantTask || "N/A"}
-Work session length: ${session.answers.workSession || "N/A"}
-Calendar sync: ${session.answers.syncCalendar || "N/A"}
-Focus mode: ${session.answers.focusMode || "N/A"}
+Begin by asking the user what tasks they want to work on today.
 
-Format the output as 5 to 8 bullet points, clear and actionable.
-      `.trim();
+Carefully collect and store all tasks the user mentions.
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini", // lighter/faster, or use "gpt-4o"
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        max_tokens: 300,
-      });
+Analyze the user’s mood and tone from their input text.
 
-      const plan = completion.choices[0].message?.content ?? "";
+If the user seems stressed, tired, or overwhelmed, plan for more frequent and longer breaks.
 
-      // Clear session
-      delete sessions[sessionId];
+If the user seems energetic and motivated, plan for normal or fewer breaks.
 
-      return NextResponse.json({ reply: plan, isFinal: true });
-    }
+Use a proven time management technique such as the Pomodoro technique or a similar method:
 
-    // Ask next question
-    const nextQuestion = FLOW[step].question;
+Divide each task into focused work sessions (e.g., 25 minutes) followed by short breaks (e.g., 5 minutes), with longer breaks after several sessions.
 
-    const systemPrompt = `You are a friendly productivity coach guiding a user through a daily productivity check-in.`;
-    const userPrompt = `
-Previous answers: ${JSON.stringify(session.answers, null, 2)}
+Insert breaks within each task session, not just between different tasks.
 
-Your task:
-1. Polite acknowledgment of the user's previous answer (if exists).
-2. Then ask the next question: "${nextQuestion}"
-3. Keep it short, natural, friendly, and encouraging.
+If the user omitted any key details like how long they want to spend on a task or session length, ask clear, specific questions to get those.
+
+Create a detailed, timestamped schedule listing all tasks, showing:
+
+Start and end times for each focused work session within tasks.
+
+Break periods interspersed appropriately based on mood and technique.
+
+Present the schedule clearly so the user can follow an efficient and balanced workflow.
+
     `.trim();
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      max_tokens: 150,
-    });
+    const userPrompt = `
+Conversation history:
+${session.history.join("\n")}
 
-    const botReply = completion.choices[0].message?.content ?? "";
+If this is the start, ask a simple opening question about user mood.
+Please generate ONLY the next question or final plan. Do NOT include explanations.
+    `.trim();
 
-    // Advance step AFTER generating response
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const result = await model.generateContent([systemPrompt, userPrompt]);
+
+    const botReply = result.response?.text()?.trim() || "Sorry, I couldn't generate a question now.";
+
+    // Add bot reply to session history
+    session.history.push(`Bot: ${botReply}`);
+
     session.step++;
 
-    return NextResponse.json({ reply: botReply, isFinal: false });
+    // Decide if conversation is final (simple heuristic: if bot reply contains "plan" bullet points)
+    const isFinal = botReply.toLowerCase().includes("•") || botReply.toLowerCase().includes("- ");
+
+    // If conversation is final, clear session
+    if (isFinal) {
+      delete sessions[sessionId];
+    }
+
+    return NextResponse.json({ reply: botReply, isFinal });
+
   } catch (error) {
     console.error("Error in /api/next:", error);
     return NextResponse.json(
-      { reply: "Sorry, something went wrong. Please try again later.", isFinal: true },
+      { reply: "Sorry, something went wrong. Please try again later. 🙏", isFinal: true },
       { status: 500 }
     );
   }
