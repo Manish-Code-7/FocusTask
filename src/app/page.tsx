@@ -1,103 +1,257 @@
-import Image from "next/image";
+"use client";
+
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Plus, MessageSquare, CheckCircle2, ListChecks, Timer } from "lucide-react";
+
+type TaskStatus = "pending" | "completed";
+
+type Task = {
+  id: string;
+  title: string;
+  estimatedMinutes: number;
+  status: TaskStatus;
+};
+
+function getClientId() {
+  if (typeof window === "undefined") return "server";
+  const key = "ft_client_id";
+  let id = window.localStorage.getItem(key);
+  if (!id) {
+    id = crypto.randomUUID();
+    window.localStorage.setItem(key, id);
+  }
+  return id;
+}
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get("filter") as TaskStatus) ?? "pending";
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const [title, setTitle] = useState("");
+  const [minutes, setMinutes] = useState<string>("");
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const clientId = typeof window !== "undefined" ? getClientId() : "server";
+
+  const fetchTasks = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/tasks?clientId=${clientId}`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setTasks(data.tasks ?? []);
+    } catch {}
+  }, [clientId]);
+
+  useEffect(() => {
+    fetchTasks();
+    const i = setInterval(fetchTasks, 5000);
+    return () => clearInterval(i);
+  }, [fetchTasks]);
+
+  const pending = useMemo(() => tasks.filter((t) => t.status === "pending"), [tasks]);
+  const completed = useMemo(() => tasks.filter((t) => t.status === "completed"), [tasks]);
+
+  async function addTask() {
+    const trimmed = title.trim();
+    const mins = Number(minutes);
+    if (!trimmed || !Number.isFinite(mins) || mins <= 0) return;
+    await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, title: trimmed, estimatedMinutes: Math.round(mins) }),
+    });
+    setTitle("");
+    setMinutes("");
+    fetchTasks();
+  }
+
+  async function markDone(id: string) {
+    await fetch(`/api/tasks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "completed" }),
+    });
+    fetchTasks();
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Track your goals for today.</p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        <Link href="/chatbot">
+          <Button className="gap-2">
+            <MessageSquare className="h-4 w-4" /> Ask AI to plan
+          </Button>
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <Card style={{ background: "linear-gradient(180deg, rgba(255,176,25,0.10), rgba(255,255,255,0))" }}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2 text-2xl font-bold">
+              <ListChecks className="h-5 w-5 text-muted-foreground" /> {pending.length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card style={{ background: "linear-gradient(180deg, rgba(255,142,142,0.10), rgba(255,255,255,0))" }}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2 text-2xl font-bold">
+              <CheckCircle2 className="h-5 w-5 text-muted-foreground" /> {completed.length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card style={{ background: "linear-gradient(180deg, rgba(164,197,255,0.12), rgba(255,255,255,0))" }}>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Focus Time (est.)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {pending.reduce((sum, t) => sum + t.estimatedMinutes, 0)} mins
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card style={{ background: "radial-gradient(800px 300px at 90% 0%, rgba(255,176,25,0.10), rgba(255,255,255,0))" }}>
+        <CardHeader>
+          <CardTitle className="text-base">Add a goal</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Input
+              placeholder="e.g., Draft weekly update"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="flex-1"
+            />
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min={1}
+                placeholder="Time (mins)"
+                value={minutes}
+                onChange={(e) => setMinutes(e.target.value)}
+                className="w-36"
+              />
+              <Button onClick={addTask} className="gap-2">
+                <Plus className="h-4 w-4" /> Add
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Tabs defaultValue={initialTab} className="w-full">
+        <TabsList>
+          <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value="completed">Completed</TabsTrigger>
+        </TabsList>
+        <TabsContent value="pending">
+          <Card style={{ background: "linear-gradient(180deg, rgba(255,176,25,0.07), rgba(255,255,255,0))" }}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Today&rsquo;s pending goals</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pending.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No pending items.</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Goal</TableHead>
+                      <TableHead className="w-36">Time</TableHead>
+                      <TableHead className="w-40"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pending.map((t) => (
+                      <TableRow key={t.id}>
+                        <TableCell className="font-medium">{t.title}</TableCell>
+                        <TableCell>{t.estimatedMinutes} mins</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Link href={`/focus?taskId=${t.id}&mins=${t.estimatedMinutes}`}>
+                              <Button size="sm" className="gap-1">
+                                <Timer className="h-4 w-4" /> Start now
+                              </Button>
+                            </Link>
+                            <Button size="sm" variant="outline" onClick={() => markDone(t.id)}>
+                              Mark done
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="completed">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Completed goals</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {completed.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No completed items yet.</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Goal</TableHead>
+                      <TableHead className="w-36">Time</TableHead>
+                      <TableHead className="w-28">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {completed.map((t) => (
+                      <TableRow key={t.id}>
+                        <TableCell className="font-medium">{t.title}</TableCell>
+                        <TableCell>{t.estimatedMinutes} mins</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-green-600 border-green-200">
+                            Completed
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Separator />
+
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">Let AI analyze your input and plan your day.</div>
+        <Link href="/chatbot">
+          <Button variant="outline" className="gap-2">
+            <MessageSquare className="h-4 w-4" /> Open Chatbot
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }

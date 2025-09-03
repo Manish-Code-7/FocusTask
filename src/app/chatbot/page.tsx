@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Card,
   CardHeader,
@@ -15,7 +17,18 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Send, Bot, User } from "lucide-react";
 
-export default function ChatBot() {
+function getClientId() {
+  const key = "ft_client_id";
+  if (typeof window === "undefined") return "server";
+  let id = window.localStorage.getItem(key);
+  if (!id) {
+    id = uuidv4();
+    window.localStorage.setItem(key, id);
+  }
+  return id;
+}
+
+export default function ChatBotPage() {
   const [sessionId] = useState(() => uuidv4());
   const [messages, setMessages] = useState<
     { role: "user" | "assistant"; text: string }[]
@@ -24,6 +37,7 @@ export default function ChatBot() {
   const [isSending, setIsSending] = useState(false);
   const [finished, setFinished] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const clientId = typeof window !== "undefined" ? getClientId() : "server";
 
   // Scroll to bottom on messages update
   useEffect(() => {
@@ -42,7 +56,7 @@ export default function ChatBot() {
       const res = await fetch("/api/next", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, message: trimmedInput }),
+        body: JSON.stringify({ sessionId, message: trimmedInput, clientId }),
       });
 
       if (!res.ok) throw new Error("Network error");
@@ -72,19 +86,29 @@ export default function ChatBot() {
   };
 
   return (
-    <Card className="max-w-2xl mx-auto flex flex-col h-[600px] shadow-xl rounded-2xl border bg-white">
+    <Card className="max-w-2xl mx-auto flex flex-col h-[600px] shadow-md rounded-xl border mt-8"
+      style={{ background: "radial-gradient(900px 400px at 90% -10%, rgba(255,176,25,0.10), rgba(255,255,255,0))" }}
+    >
       {/* Header */}
-      <CardHeader className="flex items-center justify-between p-4 bg-gray-100 rounded-t-2xl border-b">
+      <CardHeader className="flex items-center justify-between p-4 rounded-t-xl"
+        style={{ background: "linear-gradient(180deg, rgba(255,176,25,0.10), rgba(255,255,255,0))" }}
+      >
         <div className="flex items-center gap-2">
-          <Bot className="w-6 h-6 text-blue-600" />
-          <CardTitle className="text-lg font-semibold">AI Chat Assistant</CardTitle>
-          <Badge variant="outline" className="text-xs">Live</Badge>
+          <Bot className="w-6 h-6 text-gray-700" />
+          <CardTitle className="text-lg font-semibold text-gray-900">
+            AI Chat Assistant
+          </CardTitle>
+          <Badge variant="outline" className="text-xs text-gray-600 border-gray-300">
+            Live
+          </Badge>
         </div>
       </CardHeader>
 
       {/* Messages scroll area */}
-      <CardContent className="flex-1 p-4 overflow-hidden">
-        <ScrollArea className="h-full space-y-4 bg-gray-50 rounded-lg p-4">
+      <CardContent className="flex-1 p-4 overflow-hidden rounded-b-xl"
+        style={{ background: "linear-gradient(180deg, rgba(255,142,142,0.08), rgba(255,255,255,0))" }}
+      >
+        <ScrollArea className="h-full space-y-4 p-3">
           {messages.length === 0 && (
             <p className="text-center text-gray-400 mt-20 select-none">
               Start the conversation...
@@ -102,25 +126,27 @@ export default function ChatBot() {
               >
                 {!isUser && (
                   <Avatar className="w-8 h-8">
-                    <AvatarFallback className="bg-blue-100 text-blue-600">
+                    <AvatarFallback className="bg-gray-200 text-gray-700">
                       <Bot size={16} />
                     </AvatarFallback>
                   </Avatar>
                 )}
 
                 <div
-                  className={`px-4 py-2 rounded-2xl text-sm break-words ${
+                  className={`px-4 py-2 rounded-2xl text-sm break-words prose prose-sm max-w-none ${
                     isUser
-                      ? "bg-blue-600 text-white rounded-br-none"
-                      : "bg-white text-gray-900 border border-gray-200 rounded-bl-none"
+                      ? "bg-gray-800 text-white rounded-br-none"
+                      : "bg-white/90 backdrop-blur text-gray-900 border border-gray-200 rounded-bl-none"
                   }`}
                 >
-                  {m.text}
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {m.text}
+                  </ReactMarkdown>
                 </div>
 
                 {isUser && (
                   <Avatar className="w-8 h-8">
-                    <AvatarFallback className="bg-gray-200 text-gray-600">
+                    <AvatarFallback className="bg-gray-300 text-gray-600">
                       <User size={16} />
                     </AvatarFallback>
                   </Avatar>
@@ -132,12 +158,13 @@ export default function ChatBot() {
         </ScrollArea>
       </CardContent>
 
-      <Separator />
+      <Separator className="border-gray-200" />
 
       {/* Input area */}
       {!finished ? (
         <form
-          className="flex gap-2 p-4 bg-gray-100 rounded-b-2xl border-t"
+          className="flex gap-2 p-4 rounded-b-xl"
+          style={{ background: "linear-gradient(0deg, rgba(255,176,25,0.06), rgba(255,255,255,0))" }}
           onSubmit={(e) => {
             e.preventDefault();
             sendMessage();
@@ -152,7 +179,11 @@ export default function ChatBot() {
             disabled={isSending}
             className="flex-1"
           />
-          <Button type="submit" disabled={!input.trim() || isSending} className="flex items-center gap-1">
+          <Button
+            type="submit"
+            disabled={!input.trim() || isSending}
+            className="flex items-center gap-1"
+          >
             <Send className="w-4 h-4" />
             Send
           </Button>
