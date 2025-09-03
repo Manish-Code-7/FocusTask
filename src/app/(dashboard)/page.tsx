@@ -39,27 +39,34 @@ export default function Home() {
   const [title, setTitle] = useState("");
   const [minutes, setMinutes] = useState<string>("");
   const [tasks, setTasks] = useState<Task[]>([]);
+
   const clientId = typeof window !== "undefined" ? getClientId() : "server";
 
+  // Fetch tasks from API
   const fetchTasks = useCallback(async () => {
     try {
       const res = await fetch(`/api/tasks?clientId=${clientId}`, { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
       setTasks(data.tasks ?? []);
-    } catch {}
+    } catch (err) {
+      console.error("Failed to fetch tasks:", err);
+    }
   }, [clientId]);
 
+  // Load tasks on mount & poll every 5 seconds
   useEffect(() => {
     fetchTasks();
-    const i = setInterval(fetchTasks, 5000);
-    return () => clearInterval(i);
+    const interval = setInterval(fetchTasks, 5000);
+    return () => clearInterval(interval);
   }, [fetchTasks]);
 
+  // Memoize filtered tasks
   const pending = useMemo(() => tasks.filter((t) => t.status === "pending"), [tasks]);
   const completed = useMemo(() => tasks.filter((t) => t.status === "completed"), [tasks]);
 
-  async function addTask() {
+  // Add new task
+  const addTask = useCallback(async () => {
     const trimmed = title.trim();
     const mins = Number(minutes);
     if (!trimmed || !Number.isFinite(mins) || mins <= 0) return;
@@ -71,19 +78,24 @@ export default function Home() {
     setTitle("");
     setMinutes("");
     fetchTasks();
-  }
+  }, [title, minutes, clientId, fetchTasks]);
 
-  async function markDone(id: string) {
-    await fetch(`/api/tasks/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "completed" }),
-    });
-    fetchTasks();
-  }
+  // Mark task as done
+  const markDone = useCallback(
+    async (id: string) => {
+      await fetch(`/api/tasks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
+      fetchTasks();
+    },
+    [fetchTasks]
+  );
 
   return (
     <div className="space-y-8">
+      {/* Dashboard Header */}
       <div className="flex items-center justify-between">
         <div className="animate-slide-up">
           <h1 className="text-4xl font-bold gradient-text mb-2">Dashboard</h1>
@@ -96,7 +108,9 @@ export default function Home() {
         </Link>
       </div>
 
+      {/* Task Stats Cards */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        {/* Pending Tasks */}
         <Card className="hover-lift animate-scale-in" style={{ animationDelay: "0.1s" }}>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -116,6 +130,8 @@ export default function Home() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Completed Tasks */}
         <Card className="hover-lift animate-scale-in" style={{ animationDelay: "0.2s" }}>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -135,6 +151,8 @@ export default function Home() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Focus Time */}
         <Card className="hover-lift animate-scale-in" style={{ animationDelay: "0.3s" }}>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -158,6 +176,7 @@ export default function Home() {
         </Card>
       </div>
 
+      {/* Add Goal Form */}
       <Card style={{ background: "radial-gradient(800px 300px at 90% 0%, rgba(255,176,25,0.10), rgba(255,255,255,0))" }}>
         <CardHeader>
           <CardTitle className="text-base">Add a goal</CardTitle>
@@ -187,15 +206,18 @@ export default function Home() {
         </CardContent>
       </Card>
 
+      {/* Tabs for Pending & Completed */}
       <Tabs defaultValue={initialTab} className="w-full">
         <TabsList>
           <TabsTrigger value="pending">Pending</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
         </TabsList>
+
+        {/* Pending Tab */}
         <TabsContent value="pending">
           <Card style={{ background: "linear-gradient(180deg, rgba(255,176,25,0.07), rgba(255,255,255,0))" }}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Today&rsquo;s pending goals</CardTitle>
+              <CardTitle className="text-base">Today’s pending goals</CardTitle>
             </CardHeader>
             <CardContent>
               {pending.length === 0 ? (
@@ -234,6 +256,8 @@ export default function Home() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Completed Tab */}
         <TabsContent value="completed">
           <Card>
             <CardHeader className="pb-2">
@@ -273,6 +297,7 @@ export default function Home() {
 
       <Separator />
 
+      {/* AI Chatbot Button */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">Let AI analyze your input and plan your day.</div>
         <Link href="/chatbot">
