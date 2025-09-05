@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Send, Bot, User } from "lucide-react";
+import { v4 as uuidv4 } from "uuid";
 
 type Message = {
   id: number;
@@ -27,6 +28,7 @@ export default function ChatBotPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [clientId] = useState(() => uuidv4()); // Generate unique client ID
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -46,18 +48,30 @@ export default function ChatBotPage() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify({ 
+          message: trimmed,
+          clientId: clientId // Include the required clientId
+        }),
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
       const data = await response.json();
       const botMessage: Message = {
         id: Date.now() + 1,
         sender: "bot",
-        text: data?.response || (response.ok ? "No reply from server." : "Error from server."),
+        text: data?.response || "No reply from server.",
       };
       setMessages((prev) => [...prev, botMessage]);
     } catch (err) {
-      setMessages((prev) => [...prev, { id: Date.now() + 2, sender: "bot", text: "⚠️ Network error." }]);
+      console.error("Chat API error:", err);
+      setMessages((prev) => [...prev, { 
+        id: Date.now() + 2, 
+        sender: "bot", 
+        text: "⚠️ Sorry, I'm having trouble connecting right now. Please try again." 
+      }]);
     } finally {
       setLoading(false);
     }

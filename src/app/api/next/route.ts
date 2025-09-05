@@ -65,14 +65,20 @@ export async function POST(req: Request) {
     } else {
       try {
         const systemPrompt =
-          "You are Chatty, an assistant that converts user inputs into a structured plan.\n" +
-          "When appropriate, output ONLY a JSON array of tasks (no extra text).\n" +
-          "Each task object should be {\"title\":string,\"estimatedMinutes\":number}.";
+        `You are a motivating, empathetic task assistant.
+        Extract each goal or task user mentions, with estimated time for completion.
+        If user appears sad, say something uplifting and suggest a walk or nap.
+        After extracting, display tasks in a table with breaks included.
+        Always end responses with encouragement. 
+        Output extraction first, then the table, then advice.
+        Format extraction as JSON list:
+        [{"task":"<task>","estimatedTime":"<time>"}]`;
+        
 
         const userPrompt =
           "Conversation history (most recent last):\n" +
           session.history.join("\n") +
-          "\nGenerate the next helpful reply. If you are ready to propose tasks, include only the JSON array.";
+          "\nGenerate the next helpful reply. If you are ready to propose tasks, display a table with the tasks and breaks.";
 
         const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
         const result = await model.generateContent([systemPrompt, userPrompt]);
