@@ -1,9 +1,8 @@
-import { nanoid } from "nanoid";
 import { pgTable, text, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 
 // ---------------- USER ----------------
 export const user = pgTable("user", {
-  id: text("id").primaryKey().$defaultFn(() => nanoid()),
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified")
@@ -16,7 +15,7 @@ export const user = pgTable("user", {
 
 // ---------------- SESSION ----------------
 export const session = pgTable("session", {
-  id: text("id").primaryKey().$defaultFn(() => nanoid()),
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   expiresAt: timestamp("expires_at").notNull(),
   token: text("token").notNull().unique(),
   ipAddress: text("ip_address"),
@@ -30,7 +29,7 @@ export const session = pgTable("session", {
 
 // ---------------- ACCOUNT (OAuth/Password) ----------------
 export const account = pgTable("account", {
-  id: text("id").primaryKey().$defaultFn(() => nanoid()),
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   accountId: text("account_id").notNull(),
   providerId: text("provider_id").notNull(),
   userId: text("user_id")
@@ -47,7 +46,7 @@ export const account = pgTable("account", {
 
 // ---------------- VERIFICATION ----------------
 export const verification = pgTable("verification", {
-  id: text("id").primaryKey().$defaultFn(() => nanoid()),
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   identifier: text("identifier").notNull(), // email/phone
   value: text("value").notNull(), // OTP/token
   expiresAt: timestamp("expires_at").notNull(),
@@ -57,7 +56,7 @@ export const verification = pgTable("verification", {
 
 // ---------------- CHAT SESSION ----------------
 export const chatSession = pgTable("chat_session", {
-  id: text("id").primaryKey().$defaultFn(() => nanoid()),
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
@@ -69,7 +68,7 @@ export const chatSession = pgTable("chat_session", {
 
 // ---------------- MESSAGES ----------------
 export const messages = pgTable("messages", {
-  id: text("id").primaryKey().$defaultFn(() => nanoid()),
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   sessionId: text("session_id")
     .notNull()
     .references(() => chatSession.id, { onDelete: "cascade" }),
@@ -80,7 +79,7 @@ export const messages = pgTable("messages", {
 
 // ---------------- CHAT SESSIONS (for chatbot) ----------------
 export const chatSessions = pgTable("chat_sessions", {
-  id: text("id").primaryKey().$defaultFn(() => nanoid()),
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   clientId: text("client_id").notNull(), // anonymous client identifier
   title: text("title").default("New Chat"),
   isActive: boolean("is_active").default(true).notNull(),
@@ -90,7 +89,7 @@ export const chatSessions = pgTable("chat_sessions", {
 
 // ---------------- CHAT MESSAGES ----------------
 export const chatMessages = pgTable("chat_messages", {
-  id: text("id").primaryKey().$defaultFn(() => nanoid()),
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   sessionId: text("session_id")
     .notNull()
     .references(() => chatSessions.id, { onDelete: "cascade" }),
@@ -101,7 +100,7 @@ export const chatMessages = pgTable("chat_messages", {
 
 // ---------------- TASKS ----------------
 export const tasks = pgTable("tasks", {
-  id: text("id").primaryKey().$defaultFn(() => nanoid()),
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   clientId: text("client_id").notNull(), // anonymous client identifier stored in localStorage
   sessionId: text("session_id"), // optional link to chatbot sessionId
   title: text("title").notNull(),

@@ -38,17 +38,54 @@ export default function Home() {
 
   const [title, setTitle] = useState("");
   const [minutes, setMinutes] = useState<string>("");
-  const [tasks, setTasks] = useState<Task[]>([]);
+
+  // Dummy tasks with unique IDs
+  const [tasks, setTasks] = useState<Task[]>([
+    {
+      id: crypto.randomUUID(),
+      title: "Complete React assignment",
+      estimatedMinutes: 45,
+      status: "pending",
+    },
+    {
+      id: crypto.randomUUID(),
+      title: "Read 10 pages of a book",
+      estimatedMinutes: 20,
+      status: "pending",
+    },
+    {
+      id: crypto.randomUUID(),
+      title: "Team meeting preparation",
+      estimatedMinutes: 30,
+      status: "completed",
+    },
+    {
+      id: crypto.randomUUID(),
+      title: "Workout session",
+      estimatedMinutes: 40,
+      status: "completed",
+    },
+  ]);
 
   const clientId = typeof window !== "undefined" ? getClientId() : "server";
 
-  // Fetch tasks from API
+  // Fetch tasks from API (overwrites dummy if data exists)
   const fetchTasks = useCallback(async () => {
     try {
+      console.log("Fetching tasks for clientId:", clientId);
       const res = await fetch(`/api/tasks?clientId=${clientId}`, { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.error("API response not ok:", res.status, res.statusText);
+        return;
+      }
       const data = await res.json();
-      setTasks(data.tasks ?? []);
+      console.log("API response:", data);
+      if (data.tasks?.length > 0) {
+        console.log("Setting tasks from API:", data.tasks.length, "tasks");
+        setTasks(data.tasks);
+      } else {
+        console.log("No tasks returned from API");
+      }
     } catch (err) {
       console.error("Failed to fetch tasks:", err);
     }
@@ -101,11 +138,32 @@ export default function Home() {
           <h1 className="text-4xl font-bold gradient-text mb-2">Dashboard</h1>
           <p className="text-gray-600 font-medium">Track your goals and stay focused ✨</p>
         </div>
-        <Link href="/chatbot">
-          <Button className="gap-2 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-            <MessageSquare className="h-4 w-4" /> AI Assistant
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              const testClientId = "test123";
+              console.log("Loading test tasks for clientId:", testClientId);
+              fetch(`/api/tasks?clientId=${testClientId}`)
+                .then(res => res.json())
+                .then(data => {
+                  if (data.tasks?.length > 0) {
+                    setTasks(data.tasks);
+                    console.log("Loaded test tasks:", data.tasks);
+                  }
+                })
+                .catch(err => console.error("Failed to load test tasks:", err));
+            }}
+            className="text-xs"
+          >
+            Load Test Tasks
           </Button>
-        </Link>
+          <Link href="/chatbot">
+            <Button className="gap-2 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+              <MessageSquare className="h-4 w-4" /> AI Assistant
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Task Stats Cards */}
